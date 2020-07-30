@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace K911\Swoole\Bridge\Symfony\HttpFoundation;
 
-use RuntimeException;
 use Swoole\Http\Response as SwooleResponse;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
@@ -17,10 +16,6 @@ final class ResponseProcessor implements ResponseProcessorInterface
      */
     public function process(HttpFoundationResponse $httpFoundationResponse, SwooleResponse $swooleResponse): void
     {
-        if ($httpFoundationResponse instanceof StreamedResponse) {
-            throw new RuntimeException(\sprintf('HttpFoundation "StreamedResponse" response object is not yet supported'));
-        }
-
         foreach ($httpFoundationResponse->headers->allPreserveCaseWithoutCookies() as $name => $values) {
             $swooleResponse->header($name, \implode(', ', $values));
         }
@@ -42,6 +37,16 @@ final class ResponseProcessor implements ResponseProcessorInterface
 
         if ($httpFoundationResponse instanceof BinaryFileResponse) {
             $swooleResponse->sendfile($httpFoundationResponse->getFile()->getRealPath());
+        } elseif ($httpFoundationResponse instanceof StreamedResponse) {
+            ob_start(function (string $payload) use ($swooleResponse) {
+                if ($payload !== '') {
+                    $swooleResponse->write($payload);
+                }
+                return '';
+            }, 8192);
+            $httpFoundationResponse->sendContent();
+            ob_end_clean();
+            $swooleResponse->end();
         } else {
             $swooleResponse->end($httpFoundationResponse->getContent());
         }
