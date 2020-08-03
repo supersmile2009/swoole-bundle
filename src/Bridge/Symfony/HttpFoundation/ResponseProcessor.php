@@ -38,14 +38,15 @@ final class ResponseProcessor implements ResponseProcessorInterface
         if ($httpFoundationResponse instanceof BinaryFileResponse) {
             $swooleResponse->sendfile($httpFoundationResponse->getFile()->getRealPath());
         } elseif ($httpFoundationResponse instanceof StreamedResponse) {
-            ob_start(function (string $payload) use ($swooleResponse) {
-                if ($payload !== '') {
+            \ob_start(function (string $payload) use ($swooleResponse) {
+                if ('' !== $payload) {
                     $swooleResponse->write($payload);
                 }
+
                 return '';
             }, 8192);
             $httpFoundationResponse->sendContent();
-            ob_end_clean();
+            \ob_end_clean();
             $swooleResponse->end();
         } else {
             $swooleResponse->end($httpFoundationResponse->getContent());
